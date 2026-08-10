@@ -462,7 +462,12 @@ def tool_group_summary(df, group_col='Region', reference_period='2024', agg_func
 # ---------------------------------------------------------
 # 도구 9. change_rate (변화량·변화율 - 막대 차트)
 # ---------------------------------------------------------
-def tool_change_rate(df, start_period='2010', end_period='2024', top_n=10, exclude_aggregates=True, **kwargs):
+def tool_change_rate(df, start_period='2010', end_period='2024', reference_period=None, top_n=10, exclude_aggregates=True, **kwargs):
+    if reference_period and str(reference_period).strip():
+        ref_str = str(reference_period).strip()
+        if ref_str != str(start_period).strip() and ref_str in df.columns:
+            end_period = ref_str
+
     s_col = str(start_period)
     e_col = str(end_period)
     
@@ -691,7 +696,7 @@ def tool_compare_one_vs_all(df, target_name='Korea, Rep.', reference_period='202
 # ---------------------------------------------------------
 # 도구 13. custom_dynamic_query (유저 맞춤 동적 연산 폴백 도구)
 # ---------------------------------------------------------
-def tool_custom_dynamic_query(df, code_snippet=None, chart_type='bar', description=None, exclude_aggregates=True, **kwargs):
+def tool_custom_dynamic_query(df, code_snippet=None, chart_type='bar', description=None, reference_period=None, exclude_aggregates=True, **kwargs):
     """
     기존 12가지 정형 도구로 해결할 수 없는 맞춤형 질문을 위해 
     AI가 생성한 동적 파이썬 Pandas 코드를 안전하게 수행하고 차트 데이터를 추출하는 도구
@@ -709,6 +714,17 @@ def tool_custom_dynamic_query(df, code_snippet=None, chart_type='bar', descripti
         exclusion_reasons.append(f"지역/그룹/소득 집계 행 {len(agg_indices)}개 제외")
 
     if code_snippet:
+        # 유저가 4번 섹션에서 기준연도(reference_period)를 변경한 경우 코드 내 하드코딩된 종료연도 동적 교체
+        if reference_period and str(reference_period).strip():
+            ref_str = str(reference_period).strip()
+            year_matches = re.findall(r"['\"]((?:19|20)\d{2})['\"]", code_snippet)
+            if year_matches:
+                latest_year_in_code = max(year_matches, key=int)
+                if ref_str != latest_year_in_code and ref_str in df.columns:
+                    code_snippet = code_snippet.replace(f"'{latest_year_in_code}'", f"'{ref_str}'")
+                    code_snippet = code_snippet.replace(f'"{latest_year_in_code}"', f'"{ref_str}"')
+                    exclusion_reasons.append(f"기준 시점을 {latest_year_in_code}년 ➔ {ref_str}년으로 코드 내 동적 변환하여 재연산")
+
         try:
             local_vars = {"df": working_df, "pd": pd, "np": np, "re": re}
             exec(code_snippet, globals(), local_vars)
