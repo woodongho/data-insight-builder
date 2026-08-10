@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Data Insight Builder</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Marked.js CDN (마크다운 렌더링용) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- CSS 스타일시트 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 헤더 바 -->
+        <header class="app-header">
+            <div class="brand">
+                <h1>🤖 AI Data Insight Builder</h1>
+                <span class="badge">Edu Edition</span>
+            </div>
+            <div class="status-indicators">
+                <span id="api-status-badge" class="status-badge status-checking">
+                    API Key: 확인 중...
+                </span>
+                <span id="model-name-badge" class="status-badge status-model">
+                    Model: -
+                </span>
+            </div>
+        </header>
+
+        <!-- 메인 콘텐츠 영역 -->
+        <main class="main-content">
+
+            <!-- 안내 배너 -->
+            <div class="notice-banner">
+                💡 <strong>안내:</strong> 업로드된 파일은 서버 디스크에 저장되지 않으며 <strong>서버 메모리에 1개의 데이터셋만 보관</strong>됩니다. 서버를 재시작하거나 새 파일을 올리면 이전 데이터는 자동으로 사라집니다.
+            </div>
+
+            <!-- 1단계: CSV 파일 업로드 섹션 -->
+            <section class="card-section upload-section">
+                <h2>1. CSV 파일 업로드 & 진단</h2>
+                <div class="upload-box" id="drop-zone">
+                    <input type="file" id="csv-file-input" accept=".csv" class="file-input">
+                    <div class="upload-prompt">
+                        <span class="upload-icon">📁</span>
+                        <p>분석할 CSV 파일을 클릭하거나 여기로 드래그하세요.</p>
+                        <span class="file-limit">최대 용량: 10MB (형식: .csv)</span>
+                    </div>
+                </div>
+                <div id="file-info-display" class="file-info-display hidden"></div>
+            </section>
+
+            <!-- 2단계: 데이터셋 종합 진단 결과 섹션 -->
+            <section id="inspect-result-section" class="card-section hidden">
+                <h2>2. 데이터셋 종합 진단 결과 (13가지 항목)</h2>
+                
+                <!-- 경고 박스 -->
+                <div id="warnings-box" class="warnings-box hidden">
+                    <h3>⚠️ 감지된 데이터 주의사항 & 경고</h3>
+                    <ul id="warnings-list"></ul>
+                </div>
+
+                <!-- 진단 메타 정보 요약 그리드 -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <span class="metric-label">성공 인코딩</span>
+                        <span id="meta-encoding" class="metric-value">-</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">건너뛴 헤더 줄</span>
+                        <span id="meta-skipped-lines" class="metric-value">-</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">총 행 수</span>
+                        <span id="meta-total-rows" class="metric-value">-</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">총 열 수</span>
+                        <span id="meta-total-cols" class="metric-value">-</span>
+                    </div>
+                    <div class="metric-card highlight">
+                        <span class="metric-label">권장 기준연도</span>
+                        <span id="meta-rec-year" class="metric-value">-</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label">집계 행 감지</span>
+                        <span id="meta-agg-count" class="metric-value">-</span>
+                    </div>
+                </div>
+
+                <!-- 상세 정보 아코디언/탭 -->
+                <div class="details-box">
+                    <h3>📊 데이터 구조 상세</h3>
+                    <div class="detail-item">
+                        <strong>연도·날짜 후보 열:</strong> <span id="meta-year-cols">없음</span>
+                    </div>
+                    <div class="detail-item">
+                        <strong>Unnamed / 빈 열:</strong> <span id="meta-unnamed-cols">없음</span>
+                    </div>
+                </div>
+
+                <!-- 미리보기 10행 테이블 -->
+                <div class="preview-table-container">
+                    <h3>👀 데이터 상단 10행 미리보기</h3>
+                    <div class="table-wrapper">
+                        <table id="preview-table">
+                            <thead id="preview-thead"></thead>
+                            <tbody id="preview-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- AI 분석 제안 요청 버튼 -->
+                <div class="action-bar">
+                    <button id="btn-suggest" class="btn primary-btn">
+                        ✨ AI에게 최적 분석 제안받기 (/suggest)
+                    </button>
+                </div>
+            </section>
+
+            <!-- 2.5단계: 자연어 질문 분석 섹션 -->
+            <section id="custom-query-section" class="card-section hidden">
+                <h2>2.5. AI 자연어 데이터 질문하기 (/query)</h2>
+                <p class="section-desc">원하는 질문을 자유롭게 입력하면, AI가 적절한 분석 도구를 찾아 파이썬으로 정확히 계산 후 답변과 차트를 생성합니다.</p>
+                
+                <div class="query-input-bar">
+                    <input type="text" id="input-custom-question" class="form-control query-input" placeholder="예: 2024년 기준 인터넷 이용률 상위 10개 국가와 한국의 위치를 알려줘">
+                    <button id="btn-submit-query" class="btn primary-btn">
+                        🔍 질문 분석받기
+                    </button>
+                </div>
+
+                <!-- 예시 질문 칩 버튼들 -->
+                <div class="sample-chips">
+                    <span class="chip-label">💡 추천 질문 클릭:</span>
+                    <button class="chip-btn" data-question="2024년 기준 인터넷 이용률 상위 10개 국가와 한국의 위치를 알려줘">
+                        🏆 2024년 상위 10개국 & 한국 위치
+                    </button>
+                    <button class="chip-btn" data-question="한국과 미국의 인터넷 사용률 1960년부터 최신까지 추이를 비교해줘">
+                        📈 한국 vs 미국 시계열 추이
+                    </button>
+                    <button class="chip-btn" data-question="2010년과 2024년 사이에 인터넷 이용률이 가장 크게 증가한 상위 국가 목록">
+                        🚀 2010~2024년 폭풍 성장한 국가
+                    </button>
+                </div>
+
+                <!-- 자연어 질문 AI 답변 카드 -->
+                <div id="query-result-card" class="query-result-card hidden">
+                    <div class="query-result-header">
+                        <span id="query-tool-badge" class="badge">도구: -</span>
+                    </div>
+                    <div id="query-answer-body" class="markdown-body"></div>
+                    <div class="query-action-bar" style="margin-top: 15px; text-align: right;">
+                        <button id="btn-goto-vis" class="btn secondary-btn">
+                            📊 차트 시각화 및 📄 AI 보고서 생성 위치로 이동 ↓
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3단계: Gemini AI 도구 추천 카탈로그 섹션 -->
+            <section id="suggest-section" class="card-section hidden">
+                <h2>3. Gemini AI 분석 제안 (도구 카탈로그)</h2>
+                <p class="section-desc">AI가 데이터 진단 결과를 바탕으로 실행 가능한 추천 분석 도구를 골라 제안합니다.</p>
+                <div id="suggestions-grid" class="suggestions-grid"></div>
+            </section>
+
+            <!-- 4단계: 파이썬 수치 계산 및 시각화 차트 섹션 -->
+            <section id="run-section" class="card-section hidden">
+                <h2>4. Pandas 실제 연산 & 차트 시각화 (/run)</h2>
+                
+                <!-- 분석 파라미터 컨트롤 조작 바 -->
+                <div class="tool-controls-bar">
+                    <div class="control-group">
+                        <label for="select-active-tool">실행할 도구 선택:</label>
+                        <select id="select-active-tool" class="form-control"></select>
+                    </div>
+                    <div class="control-group">
+                        <label for="input-ref-period">기준 시점 (연도):</label>
+                        <input type="text" id="input-ref-period" class="form-control" placeholder="예: 2024">
+                    </div>
+                    <div class="control-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="check-exclude-agg" checked>
+                            집계 행(World, OECD 등) 자동 제외
+                        </label>
+                    </div>
+                    <button id="btn-run-tool" class="btn secondary-btn">
+                        ▶ 수치 계산 및 차트 생성
+                    </button>
+                </div>
+
+                <!-- 실행 결과 요약 정보 (행 사용/제외 수) -->
+                <div id="run-meta-summary" class="run-meta-summary hidden">
+                    <div class="summary-pill">
+                        <strong>사용된 행 수:</strong> <span id="run-rows-used">0</span>행
+                    </div>
+                    <div class="summary-pill alert">
+                        <strong>제외된 행 수:</strong> <span id="run-rows-excluded">0</span>행
+                    </div>
+                    <div class="summary-reasons">
+                        <strong>제외 사유:</strong> <span id="run-exclusion-reasons">-</span>
+                    </div>
+                </div>
+
+                <!-- Chart.js 캔버스 렌더링 영역 -->
+                <div class="chart-container">
+                    <canvas id="insight-chart"></canvas>
+                </div>
+
+                <!-- AI 해석 보고서 요청 바 -->
+                <div class="explain-actions-bar">
+                    <h3>5. AI 보고서 해석 생성 (/explain)</h3>
+                    <div class="mode-buttons">
+                        <button id="btn-explain-mode-a" class="btn outline-btn danger-border">
+                            ⚠️ 모드 A: 수치 없이 허술한 보고서 (비교용)
+                        </button>
+                        <button id="btn-explain-mode-b" class="btn primary-btn success-border">
+                            📄 모드 B: Pandas 계산 수치 정식 보고서 (추천)
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5단계: AI 분석 해석 보고서 섹션 -->
+            <section id="explain-section" class="card-section hidden">
+                <div class="report-header">
+                    <div>
+                        <h2>AI 데이터 인사이트 해석 보고서</h2>
+                        <span id="explain-mode-badge" class="mode-tag">모드 B</span>
+                    </div>
+                    <button id="btn-download-md" class="btn outline-btn success-border">
+                        📥 마크다운(.md) 보고서 다운로드
+                    </button>
+                </div>
+                <div id="explain-output" class="markdown-body"></div>
+            </section>
+
+        </main>
+
+        <!-- 하단 프론트엔드 콘솔 로그 디버그 드로어 -->
+        <footer class="console-drawer">
+            <div class="console-header" id="console-toggle">
+                <span>💻 프론트엔드 콘솔 디버그 로그 (<span id="log-count">0</span>)</span>
+                <button class="btn-text">토글 ▼</button>
+            </div>
+            <div id="console-log-body" class="console-body">
+                <div class="log-entry log-system">[PAGE] 페이지 로드 완료</div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- JS 스크립트 -->
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
