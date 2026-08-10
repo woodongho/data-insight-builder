@@ -163,6 +163,9 @@ def tool_year_coverage(df, **kwargs):
         "unit": "개 (입력 행 수)",
         "cautions": ["가장 최근 연도가 최다 데이터 보유 연도와 다를 수 있으므로 권장 기준연도 사용을 권장합니다."],
         "result": {
+            "chart_type": "bar",
+            "labels": list(coverage.keys()),
+            "values": list(coverage.values()),
             "year_coverage": coverage,
             "recommended_reference_year": rec_year
         }
@@ -239,7 +242,12 @@ def tool_describe_numeric(df, reference_period=None, column=None, exclude_aggreg
         "used_columns": [target_col],
         "unit": "수치 단위",
         "cautions": ["평균값은 극단적인 최댓값/최솟값(이상치)의 영향을 받으므로 중앙값과 함께 확인하세요."],
-        "result": stats
+        "result": {
+            "chart_type": "bar",
+            "labels": ["평균 (Mean)", "중앙값 (Median)", "최솟값 (Min)", "최댓값 (Max)"],
+            "values": [stats["mean"], stats["median"], stats["min"], stats["max"]],
+            "stats": stats
+        }
     })
 
 # ---------------------------------------------------------
@@ -558,6 +566,8 @@ def tool_distribution(df, reference_period='2024', bins=5, exclude_aggregates=Tr
             "chart_type": "histogram",
             "bin_labels": bin_labels,
             "counts": [int(c) for c in counts],
+            "labels": bin_labels,
+            "values": [int(c) for c in counts],
             "bin_edges": [round(float(b), 2) for b in bin_edges]
         }
     })
@@ -566,11 +576,19 @@ def tool_distribution(df, reference_period='2024', bins=5, exclude_aggregates=Tr
 # 도구 11. correlation_scatter (상관계수 및 산점도)
 # ---------------------------------------------------------
 def tool_correlation_scatter(df, x_col='2010', y_col='2024', exclude_aggregates=True, **kwargs):
+    col_names = [str(c) for c in df.columns]
+    year_cols = [c for c in col_names if re.match(r'^(19|20)\d{2}$', c.strip()) or pd.api.types.is_numeric_dtype(df[c])]
+    
     x_name = str(x_col)
     y_name = str(y_col)
     
+    if x_name not in df.columns and year_cols:
+        x_name = year_cols[0]
+    if y_name not in df.columns and year_cols:
+        y_name = year_cols[-1] if len(year_cols) >= 2 else year_cols[0]
+
     if x_name not in df.columns or y_name not in df.columns:
-        raise ValueError(f"상관분석을 위한 두 열('{x_name}', '{y_name}')이 데이터에 모두 존재해야 합니다.")
+        raise ValueError(f"상관분석을 위한 두 수치 열('{x_name}', '{y_name}')을 찾을 수 없습니다.")
         
     label_col = get_label_column(df)
     total_initial = len(df)
