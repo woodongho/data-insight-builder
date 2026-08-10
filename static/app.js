@@ -445,20 +445,25 @@ function renderSuggestionsGrid(suggestions) {
 
 function populateToolSelect(suggestions) {
     const select = document.getElementById('select-active-tool');
+    if (!select) return;
     select.innerHTML = '';
 
-    const allTools = [
-        "top_bottom_n", "trend_line", "group_summary", "describe_numeric",
-        "change_rate", "distribution", "correlation_scatter", "compare_one_vs_all",
-        "reshape_wide_to_long", "quality_report", "year_coverage", "detect_aggregates"
+    // 내부 전처리/품질진단 도구를 배제하고 순수 시각화·인사이트 분석 도구 8종만 노출
+    const analyticalTools = [
+        "top_bottom_n", "trend_line", "change_rate", "group_summary",
+        "correlation_scatter", "compare_one_vs_all", "distribution", "describe_numeric"
     ];
 
-    allTools.forEach(t => {
+    analyticalTools.forEach(t => {
         const opt = document.createElement('option');
         opt.value = t;
         opt.textContent = getToolDisplayName(t);
         select.appendChild(opt);
     });
+
+    if (select.value) {
+        updatePeriodControls(select.value);
+    }
 }
 
 const TWO_POINT_TOOLS = ['change_rate', 'correlation_scatter', 'trend_line', 'custom_dynamic_query'];
