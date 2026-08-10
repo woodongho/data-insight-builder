@@ -429,14 +429,14 @@ function renderSuggestionsGrid(suggestions) {
     document.querySelectorAll('.btn-select-suggestion').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const tool = e.currentTarget.getAttribute('data-tool');
-            const params = JSON.parse(e.currentTarget.getAttribute('data-params'));
+            const params = JSON.parse(e.currentTarget.getAttribute('data-params')) || {};
+            
+            currentQueryParams = Object.assign({}, params);
             
             const toolSelect = document.getElementById('select-active-tool');
             if (toolSelect) toolSelect.value = tool;
             
-            if (params.reference_period) {
-                document.getElementById('input-ref-period').value = params.reference_period;
-            }
+            updatePeriodControls(tool);
 
             executeToolWithParams(tool, params);
         });
@@ -468,7 +468,10 @@ function updatePeriodControls(toolName) {
     const twoGroup = document.getElementById('group-two-period');
     if (!singleGroup || !twoGroup) return;
 
-    if (TWO_POINT_TOOLS.includes(toolName) && (currentQueryParams.start_period || currentQueryParams.start_year || currentQueryParams.x_col || toolName === 'change_rate' || toolName === 'correlation_scatter' || toolName === 'trend_line')) {
+    const isTwoPoint = ['change_rate', 'correlation_scatter', 'trend_line'].includes(toolName) || 
+                       (toolName === 'custom_dynamic_query' && (currentQueryParams.start_period || currentQueryParams.start_year));
+
+    if (isTwoPoint) {
         singleGroup.classList.add('hidden');
         twoGroup.classList.remove('hidden');
 

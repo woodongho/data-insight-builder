@@ -263,6 +263,11 @@ def tool_trend_line(df, target_names=None, start_period=None, end_period=None, s
     if not year_cols:
         raise ValueError("추이를 분석할 연도 열이 존재하지 않습니다.")
 
+    # 실제로 수치 데이터가 입력되어 있는 연도만 1차 필터링 (결측치뿐인 1960~1989년 제외)
+    valid_year_cols = [y for y in year_cols if df[y].notna().sum() > 0]
+    if valid_year_cols:
+        year_cols = valid_year_cols
+
     # 시작/종료 연도가 지정된 경우 시계열 범위 자르기
     s_y = str(start_period or start_year or '').strip()
     e_y = str(end_period or end_year or '').strip()
@@ -478,9 +483,19 @@ def tool_change_rate(df, start_period='2010', end_period='2024', reference_perio
         if ref_str != str(start_period).strip() and ref_str in df.columns:
             end_period = ref_str
 
+    col_names = [str(c) for c in df.columns]
+    valid_year_cols = [c for c in col_names if re.match(r'^(19|20)\d{2}$', c.strip()) and df[c].notna().sum() > 0]
+
     s_col = str(start_period)
     e_col = str(end_period)
-    
+
+    # 유효 데이터가 있는 연도로 자동 보정
+    if valid_year_cols:
+        if s_col not in df.columns or df[s_col].dropna().empty:
+            s_col = valid_year_cols[0] if len(valid_year_cols) >= 2 else valid_year_cols[0]
+        if e_col not in df.columns or df[e_col].dropna().empty:
+            e_col = valid_year_cols[-1]
+            
     if s_col not in df.columns or e_col not in df.columns:
         raise ValueError(f"시작시점({s_col}) 또는 종료시점({e_col}) 열이 데이터에 없습니다.")
         
@@ -493,6 +508,15 @@ def tool_change_rate(df, start_period='2010', end_period='2024', reference_perio
     clean_df[s_col] = pd.to_numeric(clean_df[s_col], errors='coerce')
     clean_df[e_col] = pd.to_numeric(clean_df[e_col], errors='coerce')
     clean_df = clean_df.dropna(subset=[s_col, e_col])
+
+    # 만약 지정된 두 연도로 남아있는 행이 0개라면 유효한 시작/종료 연도로 자동 재설정
+    if clean_df.empty and valid_year_cols and len(valid_year_cols) >= 2:
+        s_col = valid_year_cols[0]
+        e_col = valid_year_cols[-1]
+        clean_df = working_df.dropna(subset=[s_col, e_col]).copy()
+        clean_df[s_col] = pd.to_numeric(clean_df[s_col], errors='coerce')
+        clean_df[e_col] = pd.to_numeric(clean_df[e_col], errors='coerce')
+        clean_df = clean_df.dropna(subset=[s_col, e_col])
     
     clean_df['abs_change'] = clean_df[e_col] - clean_df[s_col]
     clean_df['pct_change'] = np.where(
