@@ -336,7 +336,8 @@ async function submitCustomQuery(question) {
         // 파이썬 계산 결과를 차트에 자동 시각화
         if (data.primary_result) {
             currentToolResult = data.primary_result;
-            currentQueryParams = {};
+            // AI 라우터가 추출한 파라미터 전체(n, target_name 등) 보존
+            currentQueryParams = Object.assign({}, data.primary_params || {});
             if (data.primary_result.target_info && data.primary_result.target_info.name) {
                 currentQueryParams.target_name = data.primary_result.target_info.name;
             }

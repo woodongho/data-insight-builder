@@ -645,6 +645,7 @@ def query_question():
         return jsonify({
             "question": user_question,
             "tool_used": primary_tool_name,
+            "primary_params": primary_params,
             "korean_tool_name": TOOL_CATALOG_MAP.get(primary_tool_name, primary_tool_name),
             "primary_result": primary_result,
             "secondary_result": secondary_result,
