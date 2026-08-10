@@ -558,13 +558,16 @@ def query_question():
 [허용 도구 카탈로그]
 {json.dumps(TOOL_CATALOG, ensure_ascii=False, indent=2)}
 
-[핵심 라우팅 지침]
-1. 사용자가 특정 대상(예: "한국", "대한민국", "Korea", "미국", "Japan" 등)의 위치나 순위를 상위/하위 N개와 함께 언급한 경우:
+[핵심 라우팅 지침 - 필독!]
+1. 질문이 특정 국가/항목의 시계열 변화 추이, 연도별 추이 비교(예: "한국과 미국의 추이 비교", "1960년부터 최신까지 추이", "연도별 변화" 등)인 경우:
+   - primary_tool: "trend_line"
+   - primary_params: {{ "target_names": ["Korea, Rep.", "United States"], "exclude_aggregates": true }}
+   (절대로 reshape_wide_to_long을 선택하지 말고, 반드시 trend_line을 선택하여 질문에 등장한 대상 국가명들을 영문명 리스트로 target_names에 넣으세요)
+
+2. 질문이 특정 연도의 상위/하위 순위 위치(예: "상위 10개국과 한국 위치")인 경우:
    - primary_tool: "top_bottom_n"
    - primary_params: {{ "reference_period": "{rec_year}", "n": 10, "target_name": "Korea, Rep.", "exclude_aggregates": true }}
    (반드시 primary_params에 'target_name'으로 질문에 등장한 대상 국가명을 영문/원문 형태로 기재하세요)
-
-2. 질문이 상위/하위 순위, 시계열 추이, 상관관계, 구간분포 등 12가지 정형 도구 범위 내라면 알맞은 도구를 선택하세요.
 
 3. 질문이 기존 12가지 도구만으로 완벽히 표현하기 어려운 맞춤형 질문인 경우:
    - primary_tool: "custom_dynamic_query"
@@ -575,8 +578,8 @@ def query_question():
 
 [JSON 응답 양식]
 {{
-  "primary_tool": "top_bottom_n",
-  "primary_params": {{ "reference_period": "{rec_year}", "n": 10, "target_name": "Korea, Rep.", "exclude_aggregates": true }},
+  "primary_tool": "trend_line",
+  "primary_params": {{ "target_names": ["Korea, Rep.", "United States"], "exclude_aggregates": true }},
   "secondary_tool": "compare_one_vs_all",
   "secondary_params": {{ "target_name": "Korea, Rep.", "reference_period": "{rec_year}", "exclude_aggregates": true }}
 }}

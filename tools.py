@@ -242,6 +242,25 @@ def tool_describe_numeric(df, reference_period=None, column=None, exclude_aggreg
         "result": stats
     })
 
+COUNTRY_ALIAS = {
+    "한국": "Korea, Rep.",
+    "대한민국": "Korea, Rep.",
+    "남한": "Korea, Rep.",
+    "북한": "Korea, Dem. People's Rep.",
+    "미국": "United States",
+    "중국": "China",
+    "일본": "Japan",
+    "독일": "Germany",
+    "영국": "United Kingdom",
+    "프랑스": "France",
+    "이탈리아": "Italy",
+    "캐나다": "Canada",
+    "호주": "Australia",
+    "인도": "India",
+    "브라질": "Brazil",
+    "러시아": "Russian Federation"
+}
+
 # ---------------------------------------------------------
 # 도구 6. trend_line (연도별 추이 - 선 차트)
 # ---------------------------------------------------------
@@ -262,8 +281,20 @@ def tool_trend_line(df, target_names=None, exclude_aggregates=True, **kwargs):
     if target_names:
         if isinstance(target_names, str):
             target_names = [target_names]
-        filter_mask = working_df[label_col].astype(str).str.lower().isin([t.lower() for t in target_names])
-        sub_df = working_df[filter_mask]
+            
+        matched_indices = []
+        for name in target_names:
+            normalized_name = COUNTRY_ALIAS.get(str(name).strip(), str(name).strip())
+            # 부분 일치(contains) 검색
+            mask = working_df[label_col].astype(str).str.lower().str.contains(normalized_name.lower())
+            found_idx = working_df[mask].index.tolist()
+            if found_idx:
+                matched_indices.extend(found_idx)
+                
+        if matched_indices:
+            sub_df = working_df.loc[list(dict.fromkeys(matched_indices))]
+        else:
+            sub_df = working_df.head(5)
     else:
         sub_df = working_df.head(5)
         
@@ -273,7 +304,7 @@ def tool_trend_line(df, target_names=None, exclude_aggregates=True, **kwargs):
     datasets = []
     for _, row in sub_df.iterrows():
         name = str(row[label_col])
-        vals = [float(row[y]) if pd.notna(row[y]) else None for y in year_cols]
+        vals = [round(float(row[y]), 2) if (pd.notna(row[y]) and str(row[y]).strip() != '') else None for y in year_cols]
         datasets.append({
             "label": name,
             "data": vals
@@ -281,7 +312,7 @@ def tool_trend_line(df, target_names=None, exclude_aggregates=True, **kwargs):
         
     return sanitize_for_json({
         "tool_name": "trend_line",
-        "description": "선택한 항목들의 연도별 변화 추이(선 차트 데이터)",
+        "description": f"선택한 항목({', '.join(sub_df[label_col].astype(str).tolist())})의 시계열 변화 추이",
         "reference_period": f"{year_cols[0]}~{year_cols[-1]}",
         "rows_used": len(sub_df),
         "rows_excluded": total_initial - len(sub_df),
