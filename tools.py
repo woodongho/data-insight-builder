@@ -496,13 +496,28 @@ def tool_change_rate(df, start_period='2010', end_period='2024', top_n=10, exclu
         "rows_excluded": rows_excluded,
         "exclusion_reasons": exclusion_reasons,
         "used_columns": [label_col, s_col, e_col],
-        "unit": "변화량 (%p 및 %)",
+        "unit": "%p (퍼센트 포인트 변화량)",
         "cautions": ["시작 시점 수치가 0에 가까우면 퍼센트 변화율이 과도하게 크게 나올 수 있으니 절대 변화량도 함께 확인하세요."],
         "result": {
             "chart_type": "bar",
             "start_period": s_col,
             "end_period": e_col,
             "labels": top_growth[label_col].astype(str).tolist(),
+            "values": [round(v, 2) for v in top_growth['abs_change'].tolist()],
+            "datasets": [
+                {
+                    "label": f"{s_col}년 이용률 (%)",
+                    "data": [round(v, 2) for v in top_growth[s_col].tolist()]
+                },
+                {
+                    "label": f"{e_col}년 이용률 (%)",
+                    "data": [round(v, 2) for v in top_growth[e_col].tolist()]
+                },
+                {
+                    "label": "절대 변화량 (+%p)",
+                    "data": [round(v, 2) for v in top_growth['abs_change'].tolist()]
+                }
+            ],
             "start_values": [round(v, 2) for v in top_growth[s_col].tolist()],
             "end_values": [round(v, 2) for v in top_growth[e_col].tolist()],
             "abs_change": [round(v, 2) for v in top_growth['abs_change'].tolist()],

@@ -611,7 +611,16 @@ function renderChart(payload) {
 
     } else {
         config.type = 'bar';
-        if (res.top_chart) {
+        if (res.datasets && res.datasets.length > 0) {
+            config.data.labels = res.labels || [];
+            config.data.datasets = res.datasets.map((ds, idx) => ({
+                label: ds.label,
+                data: ds.data,
+                backgroundColor: getPaletteColor(idx, 0.7),
+                borderColor: getPaletteColor(idx, 1.0),
+                borderWidth: 1
+            }));
+        } else if (res.top_chart) {
             const labels = res.top_chart.labels || [];
             const values = res.top_chart.values || [];
             const bgColors = labels.map(l => (l.includes('📍') || l.includes('대상') || l.includes('Korea')) ? 'rgba(234, 179, 8, 0.95)' : 'rgba(56, 189, 248, 0.7)');
