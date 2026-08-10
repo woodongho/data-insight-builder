@@ -176,9 +176,19 @@
                         <label for="select-active-tool">실행할 도구 선택:</label>
                         <select id="select-active-tool" class="form-control"></select>
                     </div>
-                    <div class="control-group">
+                    <div class="control-group" id="group-single-period">
                         <label for="input-ref-period">기준 시점 (연도):</label>
                         <input type="text" id="input-ref-period" class="form-control" placeholder="예: 2024">
+                    </div>
+                    <div class="control-group hidden" id="group-two-period" style="display: flex; gap: 8px;">
+                        <div style="flex: 1;">
+                            <label for="input-start-period">시작 시점 (연도):</label>
+                            <input type="text" id="input-start-period" class="form-control" placeholder="예: 2010">
+                        </div>
+                        <div style="flex: 1;">
+                            <label for="input-end-period">종료 시점 (연도):</label>
+                            <input type="text" id="input-end-period" class="form-control" placeholder="예: 2024">
+                        </div>
                     </div>
                     <div class="control-group checkbox-group">
                         <label>

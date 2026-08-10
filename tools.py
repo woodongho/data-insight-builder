@@ -253,7 +253,7 @@ def tool_describe_numeric(df, reference_period=None, column=None, exclude_aggreg
 # ---------------------------------------------------------
 # 도구 6. trend_line (연도별 추이 - 선 차트)
 # ---------------------------------------------------------
-def tool_trend_line(df, target_names=None, exclude_aggregates=True, **kwargs):
+def tool_trend_line(df, target_names=None, start_period=None, end_period=None, start_year=None, end_year=None, exclude_aggregates=True, **kwargs):
     label_col = get_label_column(df)
     if not label_col:
         raise ValueError("추이를 분석할 항목 라벨 열을 찾을 수 없습니다.")
@@ -262,6 +262,16 @@ def tool_trend_line(df, target_names=None, exclude_aggregates=True, **kwargs):
     year_cols = [c for c in col_names if re.match(r'^(19|20)\d{2}$', c.strip())]
     if not year_cols:
         raise ValueError("추이를 분석할 연도 열이 존재하지 않습니다.")
+
+    # 시작/종료 연도가 지정된 경우 시계열 범위 자르기
+    s_y = str(start_period or start_year or '').strip()
+    e_y = str(end_period or end_year or '').strip()
+    if s_y or e_y:
+        s_bound = s_y if s_y in year_cols else year_cols[0]
+        e_bound = e_y if e_y in year_cols else year_cols[-1]
+        filtered = [y for y in year_cols if s_bound <= y <= e_bound]
+        if filtered:
+            year_cols = filtered
         
     total_initial = len(df)
     agg_indices = get_aggregate_indices(df, label_col=label_col) if exclude_aggregates else []

@@ -359,6 +359,7 @@ async function submitCustomQuery(question) {
                 const shortQ = question.length > 20 ? question.substring(0, 20) + "..." : question;
                 userOpt.textContent = `🤖 유저요구도구: ${data.korean_tool_name} ("${shortQ}")`;
                 toolSelect.value = actualTool;
+                updatePeriodControls(actualTool);
             }
         }
 
@@ -460,12 +461,39 @@ function populateToolSelect(suggestions) {
     });
 }
 
+const TWO_POINT_TOOLS = ['change_rate', 'correlation_scatter', 'trend_line', 'custom_dynamic_query'];
+
+function updatePeriodControls(toolName) {
+    const singleGroup = document.getElementById('group-single-period');
+    const twoGroup = document.getElementById('group-two-period');
+    if (!singleGroup || !twoGroup) return;
+
+    if (TWO_POINT_TOOLS.includes(toolName) && (currentQueryParams.start_period || currentQueryParams.start_year || currentQueryParams.x_col || toolName === 'change_rate' || toolName === 'correlation_scatter' || toolName === 'trend_line')) {
+        singleGroup.classList.add('hidden');
+        twoGroup.classList.remove('hidden');
+
+        const sInput = document.getElementById('input-start-period');
+        const eInput = document.getElementById('input-end-period');
+
+        if (sInput) sInput.value = currentQueryParams.start_period || currentQueryParams.start_year || currentQueryParams.x_col || '2010';
+        if (eInput) eInput.value = currentQueryParams.end_period || currentQueryParams.end_year || currentQueryParams.y_col || currentQueryParams.reference_period || '2024';
+    } else {
+        twoGroup.classList.add('hidden');
+        singleGroup.classList.remove('hidden');
+
+        const refInput = document.getElementById('input-ref-period');
+        if (refInput) refInput.value = currentQueryParams.reference_period || '2024';
+    }
+}
+
 function onToolSelectChange() {
-    const selectedOpt = document.getElementById('select-active-tool').selectedOptions[0];
+    const select = document.getElementById('select-active-tool');
+    const selectedOpt = select ? select.selectedOptions[0] : null;
     if (selectedOpt && !selectedOpt.hasAttribute('data-is-user-query')) {
         currentQueryParams = {};
     }
-    const tool = document.getElementById('select-active-tool').value;
+    const tool = select ? select.value : '';
+    updatePeriodControls(tool);
     logConsole('RUN', `도구 선택 변경: ${getToolDisplayName(tool)}`, 'run');
 }
 
@@ -473,14 +501,30 @@ function onToolSelectChange() {
 // 8. /run (Pandas 수치 연산 및 Chart.js 시각화)
 // ---------------------------------------------------------
 async function executeSelectedTool() {
-    const tool = document.getElementById('select-active-tool').value;
-    const refPeriod = document.getElementById('input-ref-period').value.trim();
+    const toolSelect = document.getElementById('select-active-tool');
+    const tool = toolSelect ? toolSelect.value : '';
     const excludeAgg = document.getElementById('check-exclude-agg').checked;
 
-    const params = Object.assign({}, currentQueryParams, {
-        reference_period: refPeriod || '2024',
-        exclude_aggregates: excludeAgg
-    });
+    let params = Object.assign({}, currentQueryParams, { exclude_aggregates: excludeAgg });
+
+    const twoGroup = document.getElementById('group-two-period');
+    const isTwoGroupVisible = twoGroup && !twoGroup.classList.contains('hidden');
+
+    if (isTwoGroupVisible || (TWO_POINT_TOOLS.includes(tool) && tool !== 'custom_dynamic_query')) {
+        const startPeriod = document.getElementById('input-start-period').value.trim() || '2010';
+        const endPeriod = document.getElementById('input-end-period').value.trim() || '2024';
+        
+        params.start_period = startPeriod;
+        params.end_period = endPeriod;
+        params.start_year = startPeriod;
+        params.end_year = endPeriod;
+        params.x_col = startPeriod;
+        params.y_col = endPeriod;
+        params.reference_period = endPeriod;
+    } else {
+        const refPeriod = document.getElementById('input-ref-period').value.trim() || '2024';
+        params.reference_period = refPeriod;
+    }
 
     executeToolWithParams(tool, params);
 }
