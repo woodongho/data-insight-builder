@@ -295,6 +295,39 @@ def inspect():
 
     return jsonify(diagnosis_result)
 
+def analyze_run_error(e, df, tool_name, params):
+    err_str = str(e)
+    year_cols = [c for c in df.columns if re.match(r'^(19|20)\d{2}$', str(c).strip())]
+    korean_tool = TOOL_CATALOG_MAP.get(tool_name, tool_name)
+    ref_period = params.get("reference_period") or params.get("column") or params.get("start_period") or ""
+
+    if "기준시점" in err_str or "열이 데이터에 없습니다" in err_str or "KeyError" in err_str or "입력해야 합니다" in err_str:
+        latest_years = ", ".join(year_cols[-5:]) if year_cols else "2024"
+        return {
+            "error": f"도구 '{korean_tool}' 실행 중 기준 시점 오류가 발생했습니다.",
+            "reason": f"입력하신 기준 시점/연도('{ref_period}')가 CSV 데이터셋 열(Header)에 존재하지 않습니다.",
+            "suggestion": f"데이터가 존재하는 연도({latest_years}) 중 하나를 '기준 시점(연도)' 상자에 입력해 주세요.",
+            "available_years": year_cols
+        }
+    elif "찾을 수 없습니다" in err_str or "empty" in err_str.lower() or "대상" in err_str:
+        return {
+            "error": f"도구 '{korean_tool}' 항목 필터링 실패",
+            "reason": f"선택된 대상 항목('{params.get('target_name', 'N/A')}')을 데이터셋에서 찾을 수 없습니다.",
+            "suggestion": "대상 국가명/항목명을 영문 정식명칭(예: 'Korea, Rep.' 또는 'Korea')으로 정확히 입력해 보세요."
+        }
+    elif "두 열" in err_str or "상관분석" in err_str:
+        return {
+            "error": f"도구 '{korean_tool}' 수치 연산 실패",
+            "reason": f"상관분석에 필요한 두 연도/수치 열이 데이터셋에 부족합니다. ({err_str})",
+            "suggestion": "다른 시점이나 두 수치 열을 포함하도록 데이터를 확인하세요."
+        }
+    else:
+        return {
+            "error": f"도구 '{korean_tool}' 실행 실패 ({err_str})",
+            "reason": "데이터셋 조건이나 선택된 도구의 입력 파라미터가 맞지 않습니다.",
+            "suggestion": "기준 시점을 데이터가 유효한 다른 연도로 변경하거나 집계 행 자동 제외 옵션을 체크/해제해 보세요."
+        }
+
 @app.route('/suggest', methods=['POST'])
 def suggest():
     global CURRENT_DATASET
@@ -311,6 +344,7 @@ def suggest():
 
     model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
     diag = CURRENT_DATASET["diagnosis"]
+    df = CURRENT_DATASET["df"]
 
     rec_year = diag.get("recommended_reference_year") or "2024"
 
@@ -377,17 +411,58 @@ def suggest():
         suggest_data = json.loads(raw_text)
 
         raw_suggestions = suggest_data.get("suggestions", [])
-        valid_suggestions = [
-            s for s in raw_suggestions
-            if isinstance(s, dict) and s.get("tool") in ALLOWED_TOOL_NAMES
-        ]
+        validated_suggestions = []
+        year_cols = diag.get("year_date_columns", [])
 
-        logger.info(f"[AI] JSON 파싱 완료 (제안 개수: {len(valid_suggestions)})")
+        for s in raw_suggestions:
+            if not isinstance(s, dict):
+                continue
+            t_name = s.get("tool")
+            if t_name not in ALLOWED_TOOL_NAMES:
+                continue
+
+            t_params = s.get("params") or {}
+            is_ok = False
+
+            # 1차 실행 및 필요시 검증 자동 보정
+            try:
+                if t_name == "custom_dynamic_query":
+                    tools.tool_custom_dynamic_query(df, **t_params)
+                else:
+                    tool_func = TOOL_FUNCTIONS[t_name]
+                    tool_func(df, **t_params)
+                is_ok = True
+            except Exception as ex1:
+                try:
+                    repaired = dict(t_params)
+                    if "reference_period" in repaired or t_name in STRICT_REF_TOOLS:
+                        repaired["reference_period"] = rec_year
+                    if t_name == "correlation_scatter" and len(year_cols) >= 2:
+                        repaired["x_col"] = year_cols[0]
+                        repaired["y_col"] = year_cols[-1]
+
+                    if t_name == "custom_dynamic_query":
+                        tools.tool_custom_dynamic_query(df, **repaired)
+                    else:
+                        tool_func = TOOL_FUNCTIONS[t_name]
+                        tool_func(df, **repaired)
+                    
+                    s["params"] = repaired
+                    is_ok = True
+                except Exception as ex2:
+                    logger.warning(f"[SUGGEST] 제안 검증 실패로 제외 (tool={t_name}): {ex1}")
+                    is_ok = False
+
+            if is_ok:
+                s["is_validated"] = True
+                validated_suggestions.append(s)
+
+        logger.info(f"[AI] 수치 연산 검증 완료 제안 개수: {len(validated_suggestions)}/{len(raw_suggestions)}")
 
         return jsonify({
             "model_used": model_name,
-            "total_suggestions": len(valid_suggestions),
-            "suggestions": valid_suggestions
+            "total_suggestions": len(validated_suggestions),
+            "suggestions": validated_suggestions
         })
 
     except Exception as e:
@@ -419,8 +494,11 @@ def run_tool():
     df = CURRENT_DATASET["df"]
 
     try:
-        tool_func = TOOL_FUNCTIONS[tool_name]
-        result_payload = tool_func(df, **params)
+        if tool_name == "custom_dynamic_query":
+            result_payload = tools.tool_custom_dynamic_query(df, **params)
+        else:
+            tool_func = TOOL_FUNCTIONS[tool_name]
+            result_payload = tool_func(df, **params)
 
         rows_used = result_payload.get("rows_used", len(df))
         rows_excluded = result_payload.get("rows_excluded", 0)
@@ -433,12 +511,10 @@ def run_tool():
 
         return jsonify(result_payload)
 
-    except ValueError as ve:
-        logger.error(f"[ERROR] 파라미터 누락/오차: {str(ve)}")
-        return jsonify({"error": str(ve)}), 400
     except Exception as e:
         logger.error(f"[ERROR] 도구 실행 실패: {str(e)}")
-        return jsonify({"error": f"도구 '{tool_name}' 실행 중 오류 발생: {str(e)}"}), 500
+        error_info = analyze_run_error(e, df, tool_name, params)
+        return jsonify(error_info), 400
 
 @app.route('/query', methods=['POST'])
 def query_question():

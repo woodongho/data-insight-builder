@@ -488,6 +488,8 @@ async function executeToolWithParams(tool, params) {
     const koreanName = getToolDisplayName(tool);
     logConsole('RUN', `도구 실행 시작: ${koreanName} (기준시점: ${params.reference_period || 'N/A'})`, 'run');
 
+    const errorBox = document.getElementById('run-error-box');
+
     try {
         const res = await fetch('/run', {
             method: 'POST',
@@ -496,8 +498,28 @@ async function executeToolWithParams(tool, params) {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '도구 실행 실패');
 
+        if (!res.ok) {
+            logConsole('ERROR', `도구 실행 실패: ${data.error || '알 수 없는 오류'}`, 'error');
+            
+            if (errorBox) {
+                errorBox.classList.remove('hidden');
+                document.getElementById('run-error-message').textContent = data.error || '도구 실행에 실패했습니다.';
+                document.getElementById('run-error-reason').textContent = `❓ 발생 원인: ${data.reason || '입력 파라미터 조건이 맞지 않습니다.'}`;
+                document.getElementById('run-error-suggestion').innerHTML = `💡 <strong>조치 가이드:</strong> ${data.suggestion || '기준 시점 연도를 변경하거나 대상 항목을 확인해 보세요.'}`;
+                
+                document.getElementById('run-meta-summary').classList.add('hidden');
+                if (currentChart) {
+                    currentChart.destroy();
+                    currentChart = null;
+                }
+            } else {
+                alert(`도구 실행 실패: ${data.error}\n원인: ${data.reason}\n조치: ${data.suggestion}`);
+            }
+            return;
+        }
+
+        if (errorBox) errorBox.classList.add('hidden');
         currentToolResult = data;
         logConsole('RUN', `도구 실행 성공 (사용 행: ${data.rows_used}, 제외 행: ${data.rows_excluded})`, 'run');
 
@@ -505,8 +527,13 @@ async function executeToolWithParams(tool, params) {
         renderChart(data);
 
     } catch (err) {
-        logConsole('ERROR', `도구 실행 실패: ${err.message}`, 'error');
-        alert(`도구 실행 실패: ${err.message}`);
+        logConsole('ERROR', `통신/도구 오류: ${err.message}`, 'error');
+        if (errorBox) {
+            errorBox.classList.remove('hidden');
+            document.getElementById('run-error-message').textContent = '도구 실행 처리 중 네트워크 또는 서버 예외가 발생했습니다.';
+            document.getElementById('run-error-reason').textContent = `❓ 원인: ${err.message}`;
+            document.getElementById('run-error-suggestion').textContent = '💡 서버 상태 및 입력값을 확인 후 다시 시도해 주세요.';
+        }
     }
 }
 

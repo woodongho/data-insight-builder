@@ -191,6 +191,14 @@
                     </button>
                 </div>
 
+                <!-- 도구 실행 실패 시 유저 친화적 오류 안내 박스 -->
+                <div id="run-error-box" class="warnings-box hidden" style="border-left: 4px solid #ef4444; background: rgba(239, 68, 68, 0.1); padding: 15px; margin-bottom: 20px; border-radius: 8px;">
+                    <h3 style="color: #fca5a5; margin-top: 0; margin-bottom: 8px;">⚠️ 도구 실행 중 오류가 발생했습니다</h3>
+                    <p id="run-error-message" style="margin: 5px 0; font-weight: bold; color: #f8fafc;"></p>
+                    <p id="run-error-reason" style="margin: 5px 0; color: #cbd5e1;"></p>
+                    <div id="run-error-suggestion" style="margin-top: 10px; padding: 8px 12px; background: rgba(0,0,0,0.3); border-radius: 6px; color: #38bdf8;"></div>
+                </div>
+
                 <!-- 실행 결과 요약 정보 (행 사용/제외 수) -->
                 <div id="run-meta-summary" class="run-meta-summary hidden">
                     <div class="summary-pill">
