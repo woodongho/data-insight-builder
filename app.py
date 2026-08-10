@@ -360,22 +360,25 @@ def suggest():
         "aggregate_rows_count": len(diag.get("aggregate_rows_detected", []))
     }
 
+    ANALYTICAL_TOOLS = [t for t in TOOL_CATALOG if t["tool"] not in {"reshape_wide_to_long", "quality_report", "year_coverage", "detect_aggregates"}]
+
     prompt = f"""
 당신은 전 세계 통계 및 CSV 데이터 분석 전문가입니다.
-아래 데이터셋 진단 요약과 12가지 분석 도구 카탈로그를 참조하여, 이 데이터에서 실행 가능한 가장 가치 있고 유용한 분석 도구를 3~5개 골라 제안해주세요.
+아래 데이터셋 진단 요약과 시각화/분석 도구 카탈로그를 참조하여, 이 데이터에서 실제 수치 연산 및 차트 시각화가 가능한 가장 가치 있고 인사이트 있는 수치 분석 도구를 3~5개 골라 제안해주세요.
 
 [데이터셋 진단 요약]
 {json.dumps(diag_summary, ensure_ascii=False, indent=2)}
 
-[허용된 12가지 도구 카탈로그 (이 도구명만 사용 가능)]
-{json.dumps(TOOL_CATALOG, ensure_ascii=False, indent=2)}
+[허용된 시각화·인사이트 분석 도구 카탈로그]
+{json.dumps(ANALYTICAL_TOOLS, ensure_ascii=False, indent=2)}
 
-[절대 지켜야 할 규칙]
+[절대 지켜야 할 규칙 - 필독!]
 1. 응답은 오직 요청된 JSON 형식만 출력해야 합니다.
-2. 'tool' 항목의 값은 위 12가지 카탈로그에 있는 영문 도구명만 사용해야 합니다.
-3. 'params'에는 데이터셋 진단 요약에 존재하는 열 이름과 파라미터를 명시하세요.
-4. 'reference_period'는 진단에서 권장된 연도('{rec_year}')를 최우선으로 활용하세요.
-5. 제안 항목 수는 3개 이상 5개 이하로 구성하세요.
+2. 데이터 전처리/진단 도구(와이드-롱 포맷 변환, 집계행 감지, 데이터 품질보고서 등)는 절대로 제안하지 마세요! 오직 차트 시각화 및 수치 연산 분석 도구(top_bottom_n, trend_line, group_summary, change_rate, distribution, correlation_scatter, compare_one_vs_all, describe_numeric)만 제안해야 합니다.
+3. 'tool' 항목의 값은 위 카탈로그에 있는 영문 도구명만 사용해야 합니다.
+4. 'params'에는 데이터셋 진단 요약에 존재하는 열 이름과 파라미터를 명시하세요.
+5. 'reference_period'는 진단에서 권장된 연도('{rec_year}')를 최우선으로 활용하세요.
+6. 제안 항목 수는 3개 이상 5개 이하로 구성하세요.
 
 [JSON 출력 양식 규격]
 {{
@@ -413,12 +416,15 @@ def suggest():
         raw_suggestions = suggest_data.get("suggestions", [])
         validated_suggestions = []
         year_cols = diag.get("year_date_columns", [])
+        
+        # 전처리/진단 도구 전면 배제 필터
+        EXCLUDE_FROM_SUGGEST = {"reshape_wide_to_long", "quality_report", "year_coverage", "detect_aggregates"}
 
         for s in raw_suggestions:
             if not isinstance(s, dict):
                 continue
             t_name = s.get("tool")
-            if t_name not in ALLOWED_TOOL_NAMES:
+            if t_name not in ALLOWED_TOOL_NAMES or t_name in EXCLUDE_FROM_SUGGEST:
                 continue
 
             t_params = s.get("params") or {}
