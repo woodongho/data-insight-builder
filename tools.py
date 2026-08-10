@@ -242,25 +242,6 @@ def tool_describe_numeric(df, reference_period=None, column=None, exclude_aggreg
         "result": stats
     })
 
-COUNTRY_ALIAS = {
-    "한국": "Korea, Rep.",
-    "대한민국": "Korea, Rep.",
-    "남한": "Korea, Rep.",
-    "북한": "Korea, Dem. People's Rep.",
-    "미국": "United States",
-    "중국": "China",
-    "일본": "Japan",
-    "독일": "Germany",
-    "영국": "United Kingdom",
-    "프랑스": "France",
-    "이탈리아": "Italy",
-    "캐나다": "Canada",
-    "호주": "Australia",
-    "인도": "India",
-    "브라질": "Brazil",
-    "러시아": "Russian Federation"
-}
-
 # ---------------------------------------------------------
 # 도구 6. trend_line (연도별 추이 - 선 차트)
 # ---------------------------------------------------------
@@ -284,9 +265,11 @@ def tool_trend_line(df, target_names=None, exclude_aggregates=True, **kwargs):
             
         matched_indices = []
         for name in target_names:
-            normalized_name = COUNTRY_ALIAS.get(str(name).strip(), str(name).strip())
-            # 부분 일치(contains) 검색
-            mask = working_df[label_col].astype(str).str.lower().str.contains(normalized_name.lower())
+            s_name = str(name).strip().lower()
+            if not s_name:
+                continue
+            # CSV 내 실제 라벨에 대해 부분 일치(contains) 검색
+            mask = working_df[label_col].astype(str).str.lower().str.contains(s_name, regex=False)
             found_idx = working_df[mask].index.tolist()
             if found_idx:
                 matched_indices.extend(found_idx)

@@ -541,11 +541,17 @@ def query_question():
     diag = CURRENT_DATASET["diagnosis"]
     rec_year = diag.get("recommended_reference_year") or "2024"
 
-    logger.info(f"[AI] NLQuery 의도 파악 시작 (질문='{user_question}')")
+    # 데이터셋의 실제 라벨 열 및 존재하는 실제 고유 항목 샘플 추출
+    label_col = tools.get_label_column(df)
+    sample_labels = []
+    if label_col and label_col in df.columns:
+        sample_labels = [str(val).strip() for val in df[label_col].dropna().unique()[:100] if str(val).strip() != '']
+
+    logger.info(f"[AI] NLQuery 의도 파악 및 엔티티 매핑 시작 (질문='{user_question}')")
 
     intent_prompt = f"""
-당신은 데이터 분석 지능형 라우터입니다.
-사용자의 질문과 CSV 데이터 진단을 읽고, 질문에 대답하기 가장 적절한 분석 도구 1~2개를 선정하거나, 기존 12개 기본 도구로 처리하기 어려운 맞춤 질문인 경우 'custom_dynamic_query'를 선택하세요.
+당신은 지능형 데이터 분석 라우터입니다.
+사용자의 질문과 데이터셋 실제 항목 목록을 대조하여, 사용자가 질문에 언급한 대상 명칭(예: "한국", "미국", "삼성" 등)을 아래 [CSV 데이터셋에 실제로 존재하는 항목명]으로 정확히 변환(Entity Resolution)하고 적절한 분석 도구를 선정하세요.
 
 [사용자 질문]
 "{user_question}"
@@ -553,23 +559,27 @@ def query_question():
 [데이터셋 정보]
 - 전체 행 수: {diag.get('total_rows')}, 전체 열 수: {diag.get('total_columns')}
 - 권장 기준연도: {rec_year}
-- 주요 열 목록: {json.dumps(diag.get('column_names', [])[:25], ensure_ascii=False)}
+- 항목 라벨 열 이름: '{label_col}'
+- CSV 데이터셋에 실제로 존재하는 항목명 샘플 (일부):
+{json.dumps(sample_labels[:70], ensure_ascii=False)}
 
 [허용 도구 카탈로그]
 {json.dumps(TOOL_CATALOG, ensure_ascii=False, indent=2)}
 
-[핵심 라우팅 지침 - 필독!]
-1. 질문이 특정 국가/항목의 시계열 변화 추이, 연도별 추이 비교(예: "한국과 미국의 추이 비교", "1960년부터 최신까지 추이", "연도별 변화" 등)인 경우:
+[핵심 엔티티 매핑 및 라우팅 지침 - 필독!]
+1. 엔티티 자동 변환 (Entity Resolution):
+   - 질문에 등장한 대상(예: "한국", "대한민국", "미국", "중국", "독일" 등)을 위 [CSV 데이터셋에 실제로 존재하는 항목명 샘플]과 대조하여 가장 부합하는 정식 문자열(예: "Korea, Rep.", "United States", "China" 등)로 변환하여 target_names 또는 target_name에 넣으세요.
+
+2. 질문이 시계열 변화 추이, 연도별 추이 비교(예: "한국과 미국의 추이 비교", "1960년부터 최신까지 추이", "연도별 변화" 등)인 경우:
    - primary_tool: "trend_line"
-   - primary_params: {{ "target_names": ["Korea, Rep.", "United States"], "exclude_aggregates": true }}
-   (절대로 reshape_wide_to_long을 선택하지 말고, 반드시 trend_line을 선택하여 질문에 등장한 대상 국가명들을 영문명 리스트로 target_names에 넣으세요)
+   - primary_params: {{ "target_names": ["변환된실제항목명1", "변환된실제항목명2"], "exclude_aggregates": true }}
+   (절대로 reshape_wide_to_long을 선택하지 말고, 반드시 trend_line을 선택하여 target_names에 매핑된 실제 항목명 리스트를 넣으세요)
 
-2. 질문이 특정 연도의 상위/하위 순위 위치(예: "상위 10개국과 한국 위치")인 경우:
+3. 질문이 특정 연도의 상위/하위 순위 위치(예: "상위 10개국과 한국 위치")인 경우:
    - primary_tool: "top_bottom_n"
-   - primary_params: {{ "reference_period": "{rec_year}", "n": 10, "target_name": "Korea, Rep.", "exclude_aggregates": true }}
-   (반드시 primary_params에 'target_name'으로 질문에 등장한 대상 국가명을 영문/원문 형태로 기재하세요)
+   - primary_params: {{ "reference_period": "{rec_year}", "n": 10, "target_name": "변환된실제항목명", "exclude_aggregates": true }}
 
-3. 질문이 기존 12가지 도구만으로 완벽히 표현하기 어려운 맞춤형 질문인 경우:
+4. 질문이 기존 12가지 도구만으로 표현하기 어려운 맞춤형 질문인 경우:
    - primary_tool: "custom_dynamic_query"
    - primary_params: {{
        "description": "질문에 부합하는 동적 연산 설명",
