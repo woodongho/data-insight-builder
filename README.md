@@ -7,10 +7,15 @@
 ![Python](https://img.shields.io/badge/Language-Python_3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Gemini API](https://img.shields.io/badge/AI-Google_Gemini_3.5_Flash_Lite-4285F4?style=flat-square&logo=google)
 ![Chart.js](https://img.shields.io/badge/Visualization-Chart.js-FF6384?style=flat-square&logo=chart.js&logoColor=white)
+![Responsive](https://img.shields.io/badge/Design-Mobile_Responsive-success?style=flat-square)
 
 ---
 
 ## 📌 주요 특징 (Key Features)
+
+0. **🔒 수업용 4자리 PIN 게이트키퍼 & LLM 남용 방지**
+   - 불특정 다수의 Gemini API 무단 호출 및 토큰 과소비를 방지하기 위한 **4자리 입장 비밀번호(`SITE_PASSWORD`)** 게이트키퍼 탑재.
+   - HMAC-SHA256 기반 서명 쿠키를 통해 브라우저당 24시간 동안 안전하게 잠금 해제 유지.
 
 1. **⚡ 메모리 기반 실시간 데이터 진단 (1단계 & 2단계)**
    - 업로드된 CSV 파일은 서버 디스크에 저장되지 않으며 **서버 메모리에 단 1개의 데이터셋만 안전하게 보관**됩니다.
@@ -32,6 +37,12 @@
    - **모드 A**: 수치 없이 파일 정보만으로 작성한 허술한 비교용 보고서.
    - **모드 B**: Pandas 계산 수치만을 엄격히 사용하여 작성한 7대 규격 정식 마크다운 보고서.
    - 자연어 질문 맥락을 보존하여 유저 질문 의도에 완벽히 부합하는 보고서 작성 및 `.md` 파일 다운로드 지원.
+
+6. **📱 모바일 완전 반응형 UI/UX 최적화 (Mobile Responsive Design)**
+   - 스마트폰 및 태블릿 화면에 완벽히 대응하는 반응형 레이아웃 적용.
+   - 상단 헤더 줄바꿈 방지 및 API/Model 상태 뱃지 2열 균형 배치.
+   - 자연어 질문 입력바, 5단계 AI 보고서 생성 버튼, 분석 컨트롤 패널의 풀-위드(Full-width) 세로 스택 전환으로 쾌적한 모바일 터치 지원.
+   - 하단 프론트엔드 콘솔 디버그 창 기본 접힘(`collapsed`) 처리로 본문 및 차트 가림 현상 원천 차단.
 
 ---
 
@@ -107,15 +118,28 @@ FLASK_DEBUG=true
 
 # 업로드 파일 용량 제한 (MB)
 MAX_UPLOAD_MB=10
+
+# 수업용 4자리 입장 비밀번호 & 세션 쿠키 서명 키
+SECRET_KEY=your_secret_key_here
+SITE_PASSWORD=1234
 ```
 
-### 4. 애플리케이션 실행
+### 4. 애플리케이션 로컬 실행
 
 ```bash
 python app.py
 ```
 
-서버가 실행되면 브라우저에서 `http://127.0.0.1:5000` 로 접속합니다.
+서버가 실행되면 브라우저에서 `http://127.0.0.1:5000` 로 접속하여 `.env`에 설정한 비밀번호를 입력합니다.
+
+---
+
+## ☁️ Vercel 클라우드 배포 (Vercel Deployment)
+
+본 애플리케이션은 **Vercel 서버리스 호스팅 배포를 완벽 지원**합니다.  
+학생 및 교육 실습용 원클릭 배포 상세 과정은 아래 전용 문서를 참고하세요:
+
+👉 **[강의자료: GitHub + Vercel로 배포하기](docs/강의자료-Vercel-배포.md)**
 
 ---
 
@@ -150,10 +174,12 @@ data-insight-builder/
 ├── tools.py               # 13가지 Pandas 수치 연산 및 차트 데이터 생성 엔진
 ├── requirements.txt       # Python 패키지 의존성 목록
 ├── .env.example           # 환경 변수 템플릿
+├── docs/
+│   └── 강의자료-Vercel-배포.md # Vercel 클라우드 배포 실습 가이드
 ├── templates/
-│   └── index.html         # 메인 웹 UI 템플릿 (1~5단계 컴포넌트)
+│   └── index.html         # 메인 웹 UI 템플릿 (4자리 PIN 게이트키퍼 + 1~5단계 컴포넌트)
 └── static/
-    ├── app.js             # 프론트엔드 비동기 연동, Chart.js 렌더링, 콘솔 로거
+    ├── app.js             # 프론트엔드 비동기 연동, Chart.js 렌더링, 콘솔 로거, PIN 인증
     └── style.css          # 다크 모드 & 글래스모피즘 디자인 시스템 스타일시트
 ```
 

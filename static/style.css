@@ -270,6 +270,9 @@ body {
     padding: 16px;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
     gap: 6px;
 }
 
@@ -281,12 +284,16 @@ body {
 .metric-label {
     font-size: 0.8rem;
     color: var(--text-muted);
+    text-align: center;
+    width: 100%;
 }
 
 .metric-value {
     font-size: 1.4rem;
     font-weight: 700;
     color: var(--text-main);
+    text-align: center;
+    width: 100%;
 }
 
 .details-box {
@@ -349,6 +356,15 @@ th {
 
 tr:nth-child(even) {
     background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* AI 제안 요청 액션 바 */
+.action-bar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 24px;
+    width: 100%;
 }
 
 /* ---------------------------------------------------------
@@ -719,4 +735,473 @@ tr:nth-child(even) {
     padding-bottom: 10px;
     border-bottom: 1px solid var(--border-color);
 }
+
+/* ---------------------------------------------------------
+   6. 수업용 4자리 PIN 게이트키퍼 모달
+   --------------------------------------------------------- */
+body.is-locked {
+    overflow: hidden;
+}
+
+body.is-locked .app-container {
+    filter: blur(6px);
+    pointer-events: none;
+    user-select: none;
+}
+
+.pin-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(10, 15, 29, 0.85);
+    backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.pin-gate[hidden] {
+    display: none !important;
+}
+
+.pin-gate-card {
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), var(--shadow-glow);
+    max-width: 420px;
+    width: 100%;
+    padding: 36px 28px;
+    text-align: center;
+    animation: scaleIn 0.25s ease-out;
+}
+
+@keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.pin-gate-kicker {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--accent-indigo);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+
+.pin-gate-card h2 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.pin-gate-help {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+}
+
+.pin-boxes {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.pin-digit {
+    width: 54px;
+    height: 64px;
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    background: rgba(15, 23, 42, 0.8);
+    color: #fff;
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.pin-digit:focus {
+    border-color: var(--accent-indigo);
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
+    transform: translateY(-2px);
+}
+
+.pin-gate-error {
+    color: var(--danger-color, #f43f5e);
+    font-size: 0.85rem;
+    font-weight: 600;
+    min-height: 20px;
+    margin-bottom: 16px;
+}
+
+.pin-gate-submit {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+    color: #fff;
+    border: none;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    transition: all 0.2s ease;
+}
+
+.pin-gate-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+}
+
+.pin-gate-credit {
+    margin-top: 24px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* =========================================================
+   7. 모바일 반응형 UI/UX 최적화 (Mobile Optimization)
+   ========================================================= */
+@media (max-width: 768px) {
+    /* 기본 컨테이너 여백 축소 및 하단 콘솔 여유 공간 확보 */
+    .app-container {
+        padding: 12px 12px 64px 12px;
+    }
+
+    /* 1. 헤더 영역 최적화 (단어 쪼개짐 및 뱃지 찌그러짐 해결) */
+    .app-header {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 14px 16px;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .brand {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+    }
+
+    .brand h1 {
+        font-size: 1.15rem;
+        white-space: nowrap;
+        gap: 6px;
+    }
+
+    .brand-icon {
+        font-size: 1.3rem;
+    }
+
+    .badge {
+        font-size: 0.7rem;
+        padding: 2px 7px;
+    }
+
+    .status-indicators {
+        display: flex;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .status-badge {
+        flex: 1;
+        font-size: 0.72rem;
+        padding: 6px 6px;
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* 2. 안내 배너 및 카드 섹션 패딩 축소 */
+    .notice-banner {
+        padding: 10px 14px;
+        font-size: 0.82rem;
+        line-height: 1.55;
+        margin-bottom: 16px;
+    }
+
+    .card-section {
+        padding: 16px 14px;
+        margin-bottom: 16px;
+        border-radius: var(--radius-md);
+    }
+
+    .card-section h2 {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+        word-break: keep-all;
+    }
+
+    .upload-box {
+        padding: 24px 14px;
+    }
+
+    .upload-icon {
+        font-size: 2.2rem;
+    }
+
+    .upload-prompt p {
+        font-size: 0.88rem;
+    }
+
+    .file-info-display {
+        font-size: 0.78rem;
+        word-break: break-all;
+    }
+
+    /* 3. 진단 메트릭 그리드 (모바일 2열 균형 배치) */
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+
+    .metric-card {
+        padding: 12px 10px;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .metric-label {
+        font-size: 0.72rem;
+        text-align: center;
+        width: 100%;
+    }
+
+    .metric-value {
+        font-size: 1.15rem;
+        text-align: center;
+        width: 100%;
+    }
+
+    /* 3.5 데이터 미리보기 하단 제안 버튼 바 모바일 중앙 정렬 & 풀위드 */
+    .action-bar {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin-top: 18px;
+    }
+
+    .action-bar .btn,
+    #btn-suggest {
+        width: 100%;
+        max-width: 100%;
+        justify-content: center;
+        text-align: center;
+        padding: 13px 18px;
+        font-size: 0.95rem;
+    }
+
+    /* 4. 자연어 질문하기 섹션 (버튼 세로 찌그러짐 해결) */
+    .query-input-bar {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .query-input {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 0.9rem;
+    }
+
+    .query-input-bar .btn {
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 0.95rem;
+        justify-content: center;
+    }
+
+    .sample-chips {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .chip-label {
+        font-size: 0.8rem;
+        margin-bottom: 2px;
+    }
+
+    .chip-btn {
+        width: 100%;
+        font-size: 0.8rem;
+        padding: 8px 12px;
+        text-align: left;
+        line-height: 1.35;
+        border-radius: 12px;
+    }
+
+    .query-result-card {
+        padding: 16px 14px;
+        margin-top: 14px;
+    }
+
+    .query-action-bar {
+        text-align: center !important;
+    }
+
+    .query-action-bar .btn {
+        width: 100%;
+        font-size: 0.82rem;
+        padding: 10px 8px;
+    }
+
+    /* 5. 도구 추천 그리드 1열 */
+    .suggestions-grid {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .suggestion-card {
+        padding: 16px 14px;
+    }
+
+    .suggestion-card .btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+    }
+
+    /* 6. 4번 파이썬 연산 컨트롤 바 세로 스택 */
+    .tool-controls-bar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px 14px;
+        gap: 12px;
+    }
+
+    .control-group {
+        width: 100%;
+    }
+
+    .control-group .form-control {
+        width: 100%;
+    }
+
+    .tool-controls-bar .btn {
+        width: 100%;
+        padding: 12px;
+        justify-content: center;
+    }
+
+    .run-meta-summary {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 14px;
+    }
+
+    .chart-wrapper {
+        height: 280px;
+        padding: 10px 6px;
+    }
+
+    .explain-actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 16px 14px;
+        gap: 14px;
+    }
+
+    .explain-actions-bar h3 {
+        font-size: 1.05rem;
+        margin-bottom: 0;
+        text-align: left;
+    }
+
+    .mode-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 100%;
+    }
+
+    .mode-buttons .btn {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+        padding: 12px 14px;
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+
+    /* 7. 보고서 헤더 및 본문 */
+    .report-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .report-header .btn {
+        width: 100%;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+
+    .markdown-body {
+        font-size: 0.88rem;
+        line-height: 1.7;
+    }
+
+    .markdown-body h2 {
+        font-size: 1.05rem;
+    }
+
+    /* 8. PIN 게이트 모달 모바일 최적화 */
+    .pin-gate-card {
+        max-width: 92vw;
+        padding: 28px 18px;
+    }
+
+    .pin-boxes {
+        gap: 8px;
+    }
+
+    .pin-digit {
+        width: 48px;
+        height: 58px;
+        font-size: 1.5rem;
+    }
+
+    /* 9. 하단 콘솔 디버그 드로어 (콘텐츠 가림 방지) */
+    .console-drawer {
+        z-index: 1000;
+    }
+
+    .console-header {
+        padding: 8px 16px;
+        font-size: 0.75rem;
+    }
+
+    .console-body {
+        max-height: 130px;
+        padding: 10px 14px;
+        font-size: 0.72rem;
+    }
+}
+
+@media (max-width: 400px) {
+    .brand h1 {
+        font-size: 1.05rem;
+    }
+
+    .pin-digit {
+        width: 42px;
+        height: 52px;
+        font-size: 1.35rem;
+    }
+}
+
 

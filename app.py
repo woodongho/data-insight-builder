@@ -4,10 +4,14 @@ import csv
 import re
 import json
 import time
+import hmac
+import hashlib
+import pickle
+import tempfile
 import logging
 import pandas as pd
 import numpy as np
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, make_response
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -24,14 +28,79 @@ logging.basicConfig(
 )
 logger = logging.getLogger("data-insight-builder")
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, "templates"),
+    static_folder=os.path.join(BASE_DIR, "static")
+)
+app.secret_key = os.getenv("SECRET_KEY", "data-insight-builder-secret-key")
 
-# 업로드 최대 용량 제한 설정 (MB)
-max_mb = int(os.getenv("MAX_UPLOAD_MB", 10))
+# 업로드 최대 용량 제한 설정 (MB) - 환경변수 빈 문자열/오류 안전 처리
+raw_mb = os.getenv("MAX_UPLOAD_MB", "10")
+try:
+    max_mb = int(raw_mb) if raw_mb else 10
+except (ValueError, TypeError):
+    max_mb = 10
 app.config['MAX_CONTENT_LENGTH'] = max_mb * 1024 * 1024
 
-# 메모리에 1개의 데이터셋만 보관하는 전역 상태
+# 4자리 PIN 수업용 입장 비밀번호 및 세션 쿠키 설정
+SITE_PASSWORD = os.getenv("SITE_PASSWORD", "").strip()
+if not SITE_PASSWORD:
+    logger.warning("SITE_PASSWORD가 설정되어 있지 않습니다. .env 파일에 4자리 비밀번호를 설정하세요.")
+ACCESS_COOKIE = "class_access"
+ACCESS_MAX_AGE = 24 * 60 * 60
+PUBLIC_PATHS = {"/health", "/api/unlock", "/api/auth/status", "/api/status", "/app.py"}
+
+def _access_token() -> str:
+    return hmac.new(
+        str(app.secret_key).encode("utf-8"),
+        SITE_PASSWORD.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+def _is_unlocked() -> bool:
+    return request.cookies.get(ACCESS_COOKIE) == _access_token()
+
+@app.before_request
+def require_class_password():
+    path = request.path
+    if request.method == "OPTIONS":
+        return None
+    if path.startswith("/static/") or path in PUBLIC_PATHS or path == "/":
+        return None
+    if _is_unlocked():
+        return None
+    if path.startswith("/api/") or path in {"/inspect", "/suggest", "/run", "/query", "/explain"}:
+        return jsonify({"error": "비밀번호가 필요합니다.", "need_password": True}), 401
+    return None
+
+# Vercel 서버리스 환경 대응 /tmp 기반 캐시 관리
+CACHE_PATH = os.path.join(tempfile.gettempdir(), "data_insight_dataset_cache.pkl")
 CURRENT_DATASET = None
+
+def get_current_dataset():
+    global CURRENT_DATASET
+    if CURRENT_DATASET is not None:
+        return CURRENT_DATASET
+    if os.path.exists(CACHE_PATH):
+        try:
+            with open(CACHE_PATH, "rb") as f:
+                CURRENT_DATASET = pickle.load(f)
+                logger.info("[CACHE] /tmp 캐시로부터 데이터셋 복원 완료")
+                return CURRENT_DATASET
+        except Exception as e:
+            logger.warning(f"[CACHE] /tmp 캐시 로드 실패: {e}")
+    return None
+
+def set_current_dataset(data):
+    global CURRENT_DATASET
+    CURRENT_DATASET = data
+    try:
+        with open(CACHE_PATH, "wb") as f:
+            pickle.dump(data, f)
+    except Exception as e:
+        logger.warning(f"[CACHE] /tmp 캐시 저장 실패: {e}")
 
 TOOL_CATALOG = [
     {"tool": "reshape_wide_to_long", "name": "연도 열을 행으로 접기 (Tidy Data 변환)"},
@@ -93,9 +162,36 @@ def call_gemini_with_retry(client, model_name, contents, config=None, max_retrie
                 raise e
 
 @app.route('/', methods=['GET'])
+@app.route('/app.py', methods=['GET'])
 def index():
     logger.info("[REQUEST] GET /")
     return render_template('index.html')
+
+@app.route('/api/auth/status', methods=['GET'])
+def auth_status():
+    unlocked = _is_unlocked()
+    return jsonify({"unlocked": unlocked}), (200 if unlocked else 401)
+
+@app.route('/api/unlock', methods=['POST'])
+def unlock():
+    data = request.get_json(silent=True) or {}
+    pin = str(data.get("password") or "").strip()
+    if not SITE_PASSWORD:
+        return jsonify({"ok": False, "error": "서버에 비밀번호가 설정되어 있지 않습니다."}), 500
+    if not pin or pin != SITE_PASSWORD:
+        return jsonify({"ok": False, "error": "비밀번호가 올바르지 않습니다."}), 401
+
+    resp = make_response(jsonify({"ok": True}))
+    resp.set_cookie(
+        ACCESS_COOKIE,
+        _access_token(),
+        max_age=ACCESS_MAX_AGE,
+        httponly=True,
+        samesite="Lax",
+        secure=request.is_secure,
+    )
+    return resp, 200
+
 
 def detect_encoding_and_header(file_bytes):
     encodings = ['utf-8-sig', 'utf-8', 'cp949', 'euc-kr']
@@ -284,14 +380,14 @@ def inspect():
 
     diagnosis_result = diagnose_dataset(df, filename, filesize, encoding, skipped_lines)
 
-    CURRENT_DATASET = {
+    set_current_dataset({
         "df": df,
         "filename": filename,
         "filesize": filesize,
         "encoding": encoding,
         "skipped_lines": skipped_lines,
         "diagnosis": diagnosis_result
-    }
+    })
 
     return jsonify(diagnosis_result)
 
@@ -330,10 +426,10 @@ def analyze_run_error(e, df, tool_name, params):
 
 @app.route('/suggest', methods=['POST'])
 def suggest():
-    global CURRENT_DATASET
     logger.info("[REQUEST] POST /suggest")
 
-    if not CURRENT_DATASET or 'diagnosis' not in CURRENT_DATASET:
+    dataset = get_current_dataset()
+    if not dataset or 'diagnosis' not in dataset:
         logger.error("[ERROR] 진단 결과 미존재")
         return jsonify({"error": "먼저 CSV 파일을 업로드하여 진단을 수행하세요."}), 400
 
@@ -343,8 +439,8 @@ def suggest():
         return jsonify({"error": "Gemini API Key가 설정되지 않았습니다. .env 파일에서 설정해주세요."}), 400
 
     model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
-    diag = CURRENT_DATASET["diagnosis"]
-    df = CURRENT_DATASET["df"]
+    diag = dataset["diagnosis"]
+    df = dataset["df"]
 
     rec_year = diag.get("recommended_reference_year") or "2024"
 
@@ -477,10 +573,10 @@ def suggest():
 
 @app.route('/run', methods=['POST'])
 def run_tool():
-    global CURRENT_DATASET
     logger.info("[REQUEST] POST /run")
 
-    if not CURRENT_DATASET or 'df' not in CURRENT_DATASET:
+    dataset = get_current_dataset()
+    if not dataset or 'df' not in dataset:
         logger.error("[ERROR] 데이터셋 미존재")
         return jsonify({"error": "분석할 CSV 데이터셋이 없습니다. 먼저 /inspect 로 업로드하세요."}), 400
 
@@ -497,7 +593,7 @@ def run_tool():
         logger.error(f"[ERROR] {tool_name} 필수 파라미터(reference_period) 누락")
         return jsonify({"error": f"'{tool_name}' 도구를 실행하려면 기준 시점(reference_period)을 필수로 입력해야 합니다."}), 400
 
-    df = CURRENT_DATASET["df"]
+    df = dataset["df"]
 
     try:
         if tool_name == "custom_dynamic_query":
@@ -512,8 +608,9 @@ def run_tool():
         logger.info(f"[TOOL] 도구명={tool_name}, 파라미터={params}, 사용행수={rows_used}, 제외행수={rows_excluded}")
         logger.info("[RESPONSE] status=200")
 
-        CURRENT_DATASET["last_run_result"] = result_payload
-        CURRENT_DATASET["last_user_question"] = None
+        dataset["last_run_result"] = result_payload
+        dataset["last_user_question"] = None
+        set_current_dataset(dataset)
 
         return jsonify(result_payload)
 
@@ -524,10 +621,10 @@ def run_tool():
 
 @app.route('/query', methods=['POST'])
 def query_question():
-    global CURRENT_DATASET
     logger.info("[REQUEST] POST /query")
 
-    if not CURRENT_DATASET or 'df' not in CURRENT_DATASET:
+    dataset = get_current_dataset()
+    if not dataset or 'df' not in dataset:
         logger.error("[ERROR] 데이터셋 미존재")
         return jsonify({"error": "먼저 CSV 파일을 업로드하여 진단을 수행하세요."}), 400
 
@@ -543,8 +640,8 @@ def query_question():
     if not user_question:
         return jsonify({"error": "질문 내용을 입력해주세요."}), 400
 
-    df = CURRENT_DATASET["df"]
-    diag = CURRENT_DATASET["diagnosis"]
+    df = dataset["df"]
+    diag = dataset["diagnosis"]
     rec_year = diag.get("recommended_reference_year") or "2024"
 
     # 데이터셋의 실제 라벨 열 및 존재하는 실제 고유 항목 샘플 추출
@@ -658,8 +755,9 @@ def query_question():
 
         logger.info("[AI] NLQuery 답변 생성 성공")
 
-        CURRENT_DATASET["last_run_result"] = primary_result
-        CURRENT_DATASET["last_user_question"] = user_question
+        dataset["last_run_result"] = primary_result
+        dataset["last_user_question"] = user_question
+        set_current_dataset(dataset)
 
         return jsonify({
             "question": user_question,
@@ -677,10 +775,10 @@ def query_question():
 
 @app.route('/explain', methods=['POST'])
 def explain():
-    global CURRENT_DATASET
     logger.info("[REQUEST] POST /explain")
 
-    if not CURRENT_DATASET or 'diagnosis' not in CURRENT_DATASET:
+    dataset = get_current_dataset()
+    if not dataset or 'diagnosis' not in dataset:
         logger.error("[ERROR] 진단 결과 미존재")
         return jsonify({"error": "먼저 CSV 파일을 업로드하고 분석 도구를 실행하세요."}), 400
 
@@ -693,8 +791,8 @@ def explain():
     data = request.get_json() or {}
     mode = str(data.get("mode", "B")).upper()
 
-    diag = CURRENT_DATASET["diagnosis"]
-    last_result = CURRENT_DATASET.get("last_run_result")
+    diag = dataset["diagnosis"]
+    last_result = dataset.get("last_run_result")
 
     logger.info(f"[AI] explain 요청 시작 (모드={mode}, model={model_name})")
 
@@ -729,7 +827,7 @@ def explain():
             if not last_result:
                 return jsonify({"error": "정식 보고서(모드 B) 작성을 위해서는 먼저 /run 으로 분석 도구를 실행해야 합니다."}), 400
 
-            last_question = CURRENT_DATASET.get("last_user_question")
+            last_question = dataset.get("last_user_question")
             question_context = f"\n- 사용자 특정 분석 질문: \"{last_question}\"" if last_question else ""
 
             prompt_b = f"""

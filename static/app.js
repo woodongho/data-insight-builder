@@ -30,6 +30,154 @@ function getToolDisplayName(toolKey) {
 }
 
 // ---------------------------------------------------------
+// 0. 수업용 4자리 PIN 게이트키퍼 인증
+// ---------------------------------------------------------
+const PIN_STORAGE_KEY = "data_insight_unlock_until";
+const PIN_TTL_MS = 24 * 60 * 60 * 1000;
+
+function hasLocalUnlock() {
+    const until = Number(localStorage.getItem(PIN_STORAGE_KEY) || 0);
+    return until > Date.now();
+}
+
+function rememberLocalUnlock() {
+    localStorage.setItem(PIN_STORAGE_KEY, String(Date.now() + PIN_TTL_MS));
+}
+
+function clearLocalUnlock() {
+    localStorage.removeItem(PIN_STORAGE_KEY);
+}
+
+function unlockAppShell() {
+    document.body.classList.remove("is-locked");
+    const gate = document.getElementById("pinGate");
+    if (gate) gate.hidden = true;
+}
+
+function showPinGate() {
+    document.body.classList.add("is-locked");
+    const gate = document.getElementById("pinGate");
+    if (gate) gate.hidden = false;
+}
+
+async function checkServerUnlock() {
+    try {
+        const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+        return res.ok;
+    } catch (err) {
+        return false;
+    }
+}
+
+function bindPinInputs() {
+    const digits = Array.from(document.querySelectorAll(".pin-digit"));
+    const form = document.getElementById("pinGateForm");
+    const errorEl = document.getElementById("pinGateError");
+    const card = document.querySelector(".pin-gate-card");
+    if (!digits.length || !form) return;
+
+    const readPin = () => digits.map((el) => el.value.replace(/\D/g, "")).join("");
+
+    digits.forEach((input, idx) => {
+        input.addEventListener("input", () => {
+            input.value = input.value.replace(/\D/g, "").slice(0, 1);
+            if (input.value && digits[idx + 1]) digits[idx + 1].focus();
+            if (errorEl) errorEl.textContent = "";
+            card?.classList.remove("is-wrong");
+            if (readPin().length === 4) form.requestSubmit();
+        });
+        input.addEventListener("keydown", (event) => {
+            if (event.key === "Backspace" && !input.value && digits[idx - 1]) {
+                digits[idx - 1].focus();
+            }
+        });
+        input.addEventListener("paste", (event) => {
+            const text = (event.clipboardData || window.clipboardData).getData("text").replace(/\D/g, "").slice(0, 4);
+            if (!text) return;
+            event.preventDefault();
+            digits.forEach((el, i) => { el.value = text[i] || ""; });
+            digits[Math.min(text.length, 3)].focus();
+            if (text.length === 4) form.requestSubmit();
+        });
+    });
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const password = readPin();
+        if (password.length !== 4) {
+            if (errorEl) errorEl.textContent = "숫자 4자리를 입력하세요.";
+            return;
+        }
+        try {
+            const res = await fetch("/api/unlock", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                card?.classList.add("is-wrong");
+                digits.forEach((el) => { el.value = ""; });
+                digits[0].focus();
+                if (errorEl) errorEl.textContent = data.error || "비밀번호가 올바르지 않습니다.";
+                return;
+            }
+            rememberLocalUnlock();
+            unlockAppShell();
+            logConsole('AUTH', '4자리 PIN 인증 성공 (24시간 유지)', 'system');
+        } catch (err) {
+            if (errorEl) errorEl.textContent = "서버에 연결할 수 없습니다.";
+        }
+    });
+
+    digits[0].focus();
+}
+
+async function ensureClassAccess() {
+    const gate = document.getElementById("pinGate");
+    if (!gate) {
+        document.body.classList.remove("is-locked");
+        return true;
+    }
+
+    if (hasLocalUnlock() && await checkServerUnlock()) {
+        unlockAppShell();
+        return true;
+    }
+
+    if (await checkServerUnlock()) {
+        rememberLocalUnlock();
+        unlockAppShell();
+        return true;
+    }
+
+    clearLocalUnlock();
+    showPinGate();
+    bindPinInputs();
+    return new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+            if (!document.body.classList.contains("is-locked")) {
+                observer.disconnect();
+                resolve(true);
+            }
+        });
+        observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    });
+}
+
+async function apiFetch(url, options = {}) {
+    options.credentials = "same-origin";
+    const res = await fetch(url, options);
+    if (res.status === 401) {
+        clearLocalUnlock();
+        showPinGate();
+        bindPinInputs();
+    }
+    return res;
+}
+
+// ---------------------------------------------------------
 // 1. 프론트엔드 콘솔 로거 (개인정보/API Key/CSV 원본 로그 금지)
 // ---------------------------------------------------------
 function logConsole(tag, message, level = 'system') {
@@ -55,7 +203,8 @@ function logConsole(tag, message, level = 'system') {
 // ---------------------------------------------------------
 // 2. 초기화 & Health Check
 // ---------------------------------------------------------
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await ensureClassAccess();
     logConsole('PAGE', '페이지 로드 완료');
     checkHealthStatus();
     initEventListeners();
@@ -217,7 +366,7 @@ async function handleFileUpload(file) {
     logConsole('INSPECT', '진단 요청 시작 (/inspect)', 'inspect');
 
     try {
-        const res = await fetch('/inspect', {
+        const res = await apiFetch('/inspect', {
             method: 'POST',
             body: formData
         });
@@ -319,7 +468,7 @@ async function submitCustomQuery(question) {
     toolBadge.textContent = 'AI 도구 선택 및 계산 중...';
 
     try {
-        const res = await fetch('/query', {
+        const res = await apiFetch('/query', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ question })
@@ -381,7 +530,7 @@ async function requestAISuggestions() {
     suggestSection.classList.remove('hidden');
 
     try {
-        const res = await fetch('/suggest', { method: 'POST' });
+        const res = await apiFetch('/suggest', { method: 'POST' });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || '제안 실패');
 
@@ -544,7 +693,7 @@ async function executeToolWithParams(tool, params) {
     const errorBox = document.getElementById('run-error-box');
 
     try {
-        const res = await fetch('/run', {
+        const res = await apiFetch('/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ tool, params })
@@ -733,7 +882,7 @@ async function requestAIExplanation(mode) {
     explainSection.classList.remove('hidden');
 
     try {
-        const res = await fetch('/explain', {
+        const res = await apiFetch('/explain', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ mode })

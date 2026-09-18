@@ -10,8 +10,26 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <!-- CSS 스타일시트 -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
+<body class="is-locked">
+    <!-- 4자리 PIN 수업용 입장 게이트키퍼 모달 -->
+    <div id="pinGate" class="pin-gate" hidden>
+        <div class="pin-gate-card">
+            <p class="pin-gate-kicker">수업용 접속</p>
+            <h2>비밀번호 4자리를 입력하세요</h2>
+            <p class="pin-gate-help">한 번 입력하면 이 브라우저에서 24시간 동안 유지됩니다.</p>
+            <form id="pinGateForm" class="pin-gate-form" autocomplete="off">
+                <div class="pin-boxes" id="pinBoxes">
+                    <input class="pin-digit" type="text" inputmode="numeric" maxlength="1" aria-label="비밀번호 1번째 자리" required autofocus>
+                    <input class="pin-digit" type="text" inputmode="numeric" maxlength="1" aria-label="비밀번호 2번째 자리" required>
+                    <input class="pin-digit" type="text" inputmode="numeric" maxlength="1" aria-label="비밀번호 3번째 자리" required>
+                    <input class="pin-digit" type="text" inputmode="numeric" maxlength="1" aria-label="비밀번호 4번째 자리" required>
+                </div>
+                <p class="pin-gate-error" id="pinGateError" role="alert"></p>
+                <button type="submit" class="btn-primary pin-gate-submit">입장하기</button>
+            </form>
+            <p class="pin-gate-credit">저작자: 우동호 · 교육 실습용 웹앱</p>
+        </div>
+    </div>
     <div class="app-container">
         <!-- 헤더 바 -->
         <header class="app-header">
@@ -114,14 +132,14 @@
                 <!-- AI 분석 제안 요청 버튼 -->
                 <div class="action-bar">
                     <button id="btn-suggest" class="btn primary-btn">
-                        ✨ AI에게 최적 분석 제안받기 (/suggest)
+                        ✨ AI에게 최적 분석 제안받기
                     </button>
                 </div>
             </section>
 
             <!-- 2.5단계: 자연어 질문 분석 섹션 -->
             <section id="custom-query-section" class="card-section hidden">
-                <h2>2.5. AI 자연어 데이터 질문하기 (/query)</h2>
+                <h2>2.5. AI 자연어 데이터 질문하기</h2>
                 <p class="section-desc">원하는 질문을 자유롭게 입력하면, AI가 적절한 분석 도구를 찾아 파이썬으로 정확히 계산 후 답변과 차트를 생성합니다.</p>
                 
                 <div class="query-input-bar">
@@ -168,7 +186,7 @@
 
             <!-- 4단계: 파이썬 수치 계산 및 시각화 차트 섹션 -->
             <section id="run-section" class="card-section hidden">
-                <h2>4. Pandas 실제 연산 & 차트 시각화 (/run)</h2>
+                <h2>4. Pandas 실제 연산 & 차트 시각화</h2>
                 
                 <!-- 분석 파라미터 컨트롤 조작 바 -->
                 <div class="tool-controls-bar">
@@ -229,7 +247,7 @@
 
                 <!-- AI 해석 보고서 요청 바 -->
                 <div class="explain-actions-bar">
-                    <h3>5. AI 보고서 해석 생성 (/explain)</h3>
+                    <h3>5. AI 보고서 해석 생성</h3>
                     <div class="mode-buttons">
                         <button id="btn-explain-mode-a" class="btn outline-btn danger-border">
                             ⚠️ 모드 A: 수치 없이 허술한 보고서 (비교용)
@@ -258,7 +276,7 @@
         </main>
 
         <!-- 하단 프론트엔드 콘솔 로그 디버그 드로어 -->
-        <footer class="console-drawer">
+        <footer class="console-drawer collapsed">
             <div class="console-header" id="console-toggle">
                 <span>💻 프론트엔드 콘솔 디버그 로그 (<span id="log-count">0</span>)</span>
                 <button class="btn-text">토글 ▼</button>
