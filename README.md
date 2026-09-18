@@ -1,11 +1,11 @@
 # 🤖 AI Data Insight Builder (Edu Edition)
 
-> **Gemini 3.1 AI와 Pandas 수치 연산을 결합한 지능형 데이터 분석, 시각화 및 인사이트 보고서 자동 생성 웹 애플리케이션**  
+> **Gemini 3.5 AI와 Pandas 수치 연산을 결합한 지능형 데이터 분석, 시각화 및 인사이트 보고서 자동 생성 웹 애플리케이션**  
 > 🎓 **출처/참고**: 우동호 박사의 AI-Builder 2주차 강의자료
 
 ![Flask](https://img.shields.io/badge/Framework-Flask-black?style=flat-square&logo=flask)
 ![Python](https://img.shields.io/badge/Language-Python_3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
-![Gemini API](https://img.shields.io/badge/AI-Google_Gemini_3.1_Flash-4285F4?style=flat-square&logo=google)
+![Gemini API](https://img.shields.io/badge/AI-Google_Gemini_3.5_Flash_Lite-4285F4?style=flat-square&logo=google)
 ![Chart.js](https://img.shields.io/badge/Visualization-Chart.js-FF6384?style=flat-square&logo=chart.js&logoColor=white)
 
 ---
@@ -99,8 +99,8 @@ pip install -r requirements.txt
 # Gemini API Key 설정
 GEMINI_API_KEY=your_actual_gemini_api_key_here
 
-# 사용할 Gemini 모델 (기본값: gemini-3.1-flash-lite)
-GEMINI_MODEL=gemini-3.1-flash-lite
+# 사용할 Gemini 모델 (기본값: gemini-3.5-flash-lite)
+GEMINI_MODEL=gemini-3.5-flash-lite
 
 # Flask 디버그 모드
 FLASK_DEBUG=true

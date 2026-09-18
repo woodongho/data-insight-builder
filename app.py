@@ -242,7 +242,7 @@ def health():
     logger.info("[REQUEST] GET /health")
     api_key = os.getenv("GEMINI_API_KEY")
     key_configured = bool(api_key and api_key.strip() and api_key != "your_gemini_api_key_here")
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     
     return jsonify({
         "status": "ok",
@@ -342,7 +342,7 @@ def suggest():
         logger.error("[ERROR] GEMINI_API_KEY 미설정")
         return jsonify({"error": "Gemini API Key가 설정되지 않았습니다. .env 파일에서 설정해주세요."}), 400
 
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     diag = CURRENT_DATASET["diagnosis"]
     df = CURRENT_DATASET["df"]
 
@@ -536,7 +536,7 @@ def query_question():
         logger.error("[ERROR] GEMINI_API_KEY 미설정")
         return jsonify({"error": "Gemini API Key가 설정되지 않았습니다. .env 파일에서 설정해주세요."}), 400
 
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     data = request.get_json() or {}
     user_question = data.get("question", "").strip()
 
@@ -689,7 +689,7 @@ def explain():
         logger.error("[ERROR] GEMINI_API_KEY 미설정")
         return jsonify({"error": "Gemini API Key가 설정되지 않았습니다. .env 파일에서 설정해주세요."}), 400
 
-    model_name = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    model_name = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
     data = request.get_json() or {}
     mode = str(data.get("mode", "B")).upper()
 
